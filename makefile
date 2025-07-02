@@ -36,6 +36,7 @@ all: lib/libframework.a \
      bin/processor_tool_risp \
      bin/processor_tool_vrisp \
      bin/network_to_jgraph \
+	 bin/whetstone_converter \
 
 riscv_vector: all \
               bin/processor_tool_vrisp_vector_full \
@@ -76,6 +77,9 @@ bin/processor_tool_vrisp_vector_fired: src/processor_tool.cpp $(FR_INC) $(VRISP_
 
 bin/processor_tool_vrisp_vector_synapses: src/processor_tool.cpp $(FR_INC) $(VRISP_INC) $(VRISP_RVV_SYNAPSES_OBJ) $(FR_LIB)
 	$(CXX) $(FR_CFLAGS) -o bin/processor_tool_vrisp_vector_synapses src/processor_tool.cpp $(VRISP_RVV_SYNAPSES_OBJ) $(FR_LIB)
+
+bin/whetstone_converter: src/whetstone_converter.cpp $(FR_INC) $(RISP_INC) $(RISP_OBJ) $(FR_LIB) 
+	$(CXX) $(FR_CFLAGS) -o bin/whetstone_converter src/whetstone_converter.cpp $(RISP_OBJ) $(FR_LIB)
 
 # ------------------------------------------------------------
 # Utilities.
