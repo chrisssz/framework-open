@@ -264,6 +264,35 @@ json weights_to_json(const string& path)
   return j;
 }
 
+bool read_json(const vector <string> &sv, size_t starting_field, json &rv)
+{
+  bool success;
+  string s;
+  ifstream fin;
+
+  rv.clear();
+  if (starting_field < sv.size()) {
+  fin.clear();
+  fin.open(sv[starting_field].c_str());
+  if (fin.fail()) {
+    perror(sv[starting_field].c_str());
+    return false;
+  }
+  try { fin >> rv; success = true; } catch(...) { success = false; }
+  fin.close();
+  return success;
+
+  } else {
+  try {
+    cin >> rv;
+    getline(cin, s);
+    return true;
+  } catch (...) {
+    return false;
+  }
+  }
+}
+
 bool is_number(const string& str) {
   size_t i;
 
@@ -299,7 +328,7 @@ int main(int argc, char **argv)
   vector <double> thresholds;
   vector <string> layer_types;
   json weights, tmp_j, input_shape;
-  double div;
+  double div, dval;
   bool w_assigned, i_assigned, l_assigned, is_preprocessing, m_built;
 
   MOA rng;
@@ -330,134 +359,96 @@ int main(int argc, char **argv)
   div = -1;
 
   while(1) {
-    if (prompt != "") printf("%s", prompt.c_str());
-    if (!getline(cin, l)) return 0;
-    sv.clear();
-    ss.clear();
-    ss.str(l);
-    while (ss >> s) sv.push_back(s);
+    try {
+      if (prompt != "") printf("%s", prompt.c_str());
+      if (!getline(cin, l)) return 0;
+      sv.clear();
+      ss.clear();
+      ss.str(l);
+      while (ss >> s) sv.push_back(s);
 
-    size = sv.size();
-    if (size != 0) to_uppercase(sv[0]);
+      size = sv.size();
+      if (size != 0) to_uppercase(sv[0]);
 
-    if (size == 0) {
-    } else if (sv[0][0] == '#') {
-    } else if (sv[0] == "?") {
-        print_commands(stdout);
-    } else if (sv[0] == "Q") {
-        exit(0);
-    } else if (sv[0] == "WEIGHTS" || sv[0] == "W") {
-        try {
-            if (size < 2) {
-                throw SRE("usage WEIGHTS [filepath/to/weights]");
-            }
-        } catch (SRE &e){
-            printf("%s\n", e.what());
-        }
-
-        weights = weights_to_json(sv[1]);
-
-        w_assigned = true;
-
-    } else if (sv[0] == "INPUT_SHAPE" || sv[0] == "IS") {
-        s.clear();
-
-        for (i = 1; i < sv.size(); i++) {
-            s += sv[i];
-        }
-
-        try {
-            input_shape = json::parse(s);
-        } catch (const json::parse_error &e) {
-            printf("Bad Input Shape JSON: %s\n", s.c_str());
-        }
-
-        i_assigned = true;
-
-    } else if (sv[0] == "LAYER_TYPES" || sv[0] == "LT") {
-        s.clear();
-
-        for (i = 1; i < sv.size(); i++) {
-            s += sv[i];
-        }
-
-        try {
-            tmp_j = json::parse(s);
-        } catch (const json::parse_error &e) {
-            printf("Bad Layer Types Format: %s\n", s.c_str());
-        }
-
-        layer_types.clear();
-
-        try {
+      if (size == 0) {
+      } else if (sv[0][0] == '#') {
+      } else if (sv[0] == "?") {
+          print_commands(stdout);
+      } else if (sv[0] == "Q") {
+          exit(0);
+      } else if (sv[0] == "WEIGHTS" || sv[0] == "W") {
+          if(!read_json(sv, 1, weights)) printf("usage: WEIGHTS/W weights_json; Bad json\n");
+          else w_assigned = true;
+      } else if (sv[0] == "INPUT_SHAPE" || sv[0] == "IS") {
+          if(!read_json(sv, 1, weights)) printf("usage: INPUT_SHAPE/IS input_shape_json: Bad json\n");
+          else i_assigned = true;
+      } else if (sv[0] == "LAYER_TYPES" || sv[0] == "LT") {
+          if(!read_json(sv, 1, tmp_j)) printf("usage: LAYER_TYPES/LT layer_types_json: Bad json\n");
+          else {
+            layer_types.clear();
             for (i = 0; i < tmp_j.size(); i++) {
                 layer_types.push_back(tmp_j[i]);
             }
-        } catch (const std::exception &e) {
-            printf("%s\n", e.what());
+
+            tmp_j.clear();
+
+            l_assigned = true;
         }
 
-        tmp_j.clear();
-
-        l_assigned = true;
-
-    } else if (sv[0] == "THRESHOLDS" || sv[0] == "T") {
-        s.clear();
-
-        for (i = 1; i < sv.size(); i++) {
-            s += sv[i];
-        }
-
-        try {
-            tmp_j = json::parse(s);
-        } catch (const json::parse_error &e) {
-            printf("Bad Thresholds Format: %s\n", s.c_str());
-        }
-
-        thresholds.clear();
-
-        try {
+      } else if (sv[0] == "THRESHOLDS" || sv[0] == "T") {
+          if(!read_json(sv, 1, tmp_j)) printf("usage: THRESHOLDS/T thresholds_json_json: Bad json\n");
+          else {
             for (i = 0; i < tmp_j.size(); i++) {
-                thresholds.push_back(tmp_j[i]);
+              try {
+                dval = tmp_j[i].get<double>();
+              } catch (...) {
+                throw SRE("THRESHOLDS/T thresholds_json: Bad value"); 
+              }
             }
-        } catch (const std::exception &e) {
-            printf("%s\n", e.what());
-        }
 
-        tmp_j.clear();
+            thresholds.clear();
 
-    } else if (sv[0] == "DIVISOR" || sv[0] == "D") {
+            for (i = 0; i < tmp_j.size(); i++) thresholds.push_back(tmp_j[i].get<double>());
+            tmp_j.clear();
+          }
 
-       if (sscanf(sv[1].c_str(), "%lf", &div) != 1) {
-           printf("Bad divisor: %s\n", sv[1].c_str());
-       }
+      } else if (sv[0] == "DIVISOR" || sv[0] == "D") {
 
-    } else if (sv[0] == "PREPROCESSING" || sv[0] == "P") {
+         if (sscanf(sv[1].c_str(), "%lf", &div) != 1) {
+             printf("Bad divisor: %s\n", sv[1].c_str());
+         }
 
-        is_preprocessing = !is_preprocessing;
+      } else if (sv[0] == "PREPROCESSING" || sv[0] == "P") {
 
-        printf("Preprocessing is now %s\n", is_preprocessing ? "true" : "false");
+          is_preprocessing = !is_preprocessing;
 
-    } else if (sv[0] == "BUILD") {
+          printf("Preprocessing is now %s\n", is_preprocessing ? "true" : "false");
 
-        if (!w_assigned && !i_assigned && !l_assigned) printf("Must set weights, input_shape, and layer_types before calling build\n");
-        else if (!i_assigned && !l_assigned) printf("Must set input_shape, and layer_types before calling build\n");
-        else if (!w_assigned && !l_assigned) printf("Must set weights, and layer_types before calling build\n");
-        else if (!w_assigned && !i_assigned) printf("Must set weights, and input_shape before calling build\n");
-        else if (!l_assigned) printf("Must set layer_types before calling build\n");
-        else if (!i_assigned) printf("Must set input_shape before calling build\n");
-        else if (!w_assigned) printf("Must set weights before calling build\n");
-        else {
-            m->create_model(weights, input_shape, layer_types, thresholds, div, is_preprocessing);
-            m->calculate();
-            m_built = true;
-        }
-    } else if (sv[0] == "SAVE") {
-        if (!m_built) {
-            printf("Must build the network before saving\n");
-        } else {
-            m->write_network(sv[1]);
-        }
+      } else if (sv[0] == "BUILD") {
+
+          if (!w_assigned && !i_assigned && !l_assigned) printf("Must set weights, input_shape, and layer_types before calling build\n");
+          else if (!i_assigned && !l_assigned) printf("Must set input_shape, and layer_types before calling build\n");
+          else if (!w_assigned && !l_assigned) printf("Must set weights, and layer_types before calling build\n");
+          else if (!w_assigned && !i_assigned) printf("Must set weights, and input_shape before calling build\n");
+          else if (!l_assigned) printf("Must set layer_types before calling build\n");
+          else if (!i_assigned) printf("Must set input_shape before calling build\n");
+          else if (!w_assigned) printf("Must set weights before calling build\n");
+          else {
+              m->create_model(weights, input_shape, layer_types, thresholds, div, is_preprocessing);
+              m->calculate();
+              m_built = true;
+          }
+      } else if (sv[0] == "SAVE") {
+          if (!m_built) {
+              printf("Must build the network before saving\n");
+          } else {
+              m->write_network(sv[1]);
+          }
+      } else {
+          printf("Invalid command %s.  Use '?' to print a list of commands.\n", sv[0].c_str());
+      }
+    } catch (const std::exception &e) {
+      printf("%s\n", e.what());
     }
   }
 }
@@ -771,6 +762,8 @@ void Model::calculate() {
     }
     if (error != "") std::cerr << error << endl;
   }
+
+  printf("Head Bias Neuron ID (you will need this to run the network): %d\n", head_bn->id);
 }
 
 void Model::write_network(const string &path) {
